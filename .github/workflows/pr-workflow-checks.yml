@@ -20,7 +20,12 @@ jobs:
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
-          console.log(JSON.stringify(context.issue))
+          const opts = await github.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          })
+          console.log(JSON.stringify(opts))
 
     - uses: actions/github-script@0.6.0
       if: failure()
