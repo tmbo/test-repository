@@ -27,10 +27,10 @@ jobs:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
           const MARKER = '<!-- milestone-comment -->'
-          const opts = github.issues.getComments({
-            owner: 'tmbo',
-            repo: 'test-repository',
-            number: context.issue.number
+          const opts = github.issues.listComments({
+            context.repo.owner,
+            context.repo.repo,
+            context.issue.number
           })
           const comments = await github.paginate(opts)
 
