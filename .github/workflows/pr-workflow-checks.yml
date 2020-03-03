@@ -20,7 +20,6 @@ jobs:
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
-          var core = require('@actions/core')
           const response = await github.pulls.get({
             owner: context.repo.owner,
             repo: context.repo.repo,
@@ -31,7 +30,7 @@ jobs:
               response.data.milestone.title.startsWith("Rasa X")) {
             console.log("PR has a proper Milestone!")
           } else {
-             core.setFailed("PR doesn't have a proper milestone assigned.");
+             throw "PR doesn't have a proper milestone assigned."
           }
 
     - uses: actions/github-script@0.6.0
