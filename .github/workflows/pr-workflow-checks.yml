@@ -27,7 +27,7 @@ jobs:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
           const MARKER = '<!-- milestone-comment -->'
-          const opts = github.issues.listComments({
+          const opts = github.issues.listComments.endpoint.merge({
             owner: context.repo.owner,
             repo: context.repo.repo,
             issue_number: context.issue.number
