@@ -26,27 +26,25 @@ jobs:
       with:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
-          async function f() {
-            const MARKER = '<!-- milestone-comment -->'
-            const opts = github.issues.getComments({
-              owner: 'tmbo',
-              repo: 'test-repository',
-              number: context.issue.number
-            })
-            const comments = await github.paginate(opts)
+          const MARKER = '<!-- milestone-comment -->'
+          const opts = github.issues.getComments({
+            owner: 'tmbo',
+            repo: 'test-repository',
+            number: context.issue.number
+          })
+          const comments = await github.paginate(opts)
 
-            for (const comment of comments) {
-              if (comment.body.includes(MARKER)) {
-                return  // PR already contains a comment requesting a milestone
-              }
+          for (const comment of comments) {
+            if (comment.body.includes(MARKER)) {
+              return  // PR already contains a comment requesting a milestone
             }
-
-            const body = 'This PR doesn\'t have a milestone assigned - let\'s make sure \neveryone knows which release this is going to be in.\n\n' + MARKER
-
-            github.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            })
           }
+
+          const body = 'This PR doesn\'t have a milestone assigned - let\'s make sure \neveryone knows which release this is going to be in.\n\n' + MARKER
+
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          })
