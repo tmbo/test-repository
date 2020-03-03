@@ -27,11 +27,11 @@ jobs:
         github-token: ${{secrets.GITHUB_TOKEN}}
         script: |
           const MARKER = '<!-- milestone-comment -->'
-          const opts = github.issues.listComments({
+          const opts = github.issues.listComments(
             context.repo.owner,
             context.repo.repo,
             context.issue.number
-          })
+          )
           const comments = await github.paginate(opts)
 
           for (const comment of comments) {
