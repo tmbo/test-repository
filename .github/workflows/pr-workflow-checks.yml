@@ -40,7 +40,10 @@ jobs:
             }
           }
 
-          const body = 'This PR doesn\'t have a milestone assigned - let\'s make sure everyone knows which release this is supposed to be part of.\n\n*To rerun this check, you need to either comment or push a new commit.*\n\n' + MARKER
+          const body = 'This PR doesn\'t have a milestone assigned - ' +
+                       'let\'s make sure everyone knows which release this ' +
+                       'is supposed to be part of.\n\n*To rerun this check, ' +
+                       'you need to either comment or push a new commit.*\n\n' + MARKER
 
           github.issues.createComment({
             issue_number: context.issue.number,
