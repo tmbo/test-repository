@@ -34,16 +34,13 @@ jobs:
           })
           const comments = await github.paginate(opts)
 
-          console.log(JSON.stringify(comments))
-
           for (const comment of comments) {
-            console.log(JSON.stringify(comment))
             if (comment.body.includes(MARKER)) {
               return  // PR already contains a comment requesting a milestone
             }
           }
 
-          const body = 'This PR doesn\'t have a milestone assigned - let\'s make sure \neveryone knows which release this is going to be in.\n\n' + MARKER
+          const body = 'This PR doesn\'t have a milestone assigned - let\'s make sure everyone knows which release this is supposed to be part of.\n\n*To rerun this check, you need to either comment or push a new commit.*\n\n' + MARKER
 
           github.issues.createComment({
             issue_number: context.issue.number,
