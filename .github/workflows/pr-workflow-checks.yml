@@ -35,7 +35,7 @@ jobs:
           const comments = await github.paginate(opts)
 
           for (const comment of comments) {
-            print(comment)
+            console.log(JSON.stringify(comment))
             if (comment.body.includes(MARKER)) {
               return  // PR already contains a comment requesting a milestone
             }
