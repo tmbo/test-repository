@@ -1,5 +1,5 @@
 # test-repository
 
-contribution!
+contribution! ---- YES
 
 this is a random test
