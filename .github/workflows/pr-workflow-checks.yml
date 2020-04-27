@@ -1,0 +1,65 @@
+name: PR Sanity checks
+
+on:
+  pull_request:
+    types: [edited, opened, synchronize, reopened]
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  milestone:
+    name: Release Milestone Present
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout git repository 🕝
+      uses: actions/checkout@v2
+
+    - name: Check a release milestone is assigned
+      uses: actions/github-script@0.6.0
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          const response = await github.pulls.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number
+          })
+
+          if (response.data && response.data.milestone &&
+              response.data.milestone.title.startsWith("Rasa X")) {
+            console.log("PR has a proper Milestone!")
+          } else {
+             throw "PR doesn't have a proper milestone assigned."
+          }
+
+    - uses: actions/github-script@0.6.0
+      if: failure()
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          const MARKER = '<!-- milestone-comment -->'
+          const opts = github.issues.listComments.endpoint.merge({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number
+          })
+          const comments = await github.paginate(opts)
+
+          for (const comment of comments) {
+            if (comment.body.includes(MARKER)) {
+              return  // PR already contains a comment requesting a milestone
+            }
+          }
+
+          const body = 'This PR doesn\'t have a milestone assigned - ' +
+                       'let\'s make sure everyone knows which release this ' +
+                       'is supposed to be part of.\n\n*To rerun this check, ' +
+                       'you need to either comment or push a new commit.*\n\n' + MARKER
+
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          })

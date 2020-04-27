@@ -1,0 +1,128 @@
+name: Deploy Test Instance
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  deploy_to_k8s_cluster:
+    name: Deploy Rasa Enterprise to K8s cluster
+    runs-on: ubuntu-latest
+
+    # avoids triggering the workflow for comments on issues
+    if: github.event_name == 'pull_request' || contains(github.event.comment.html_url, '/pull/')
+
+    steps:
+    - name: Checkout git repository 🕝
+      uses: actions/checkout@v2
+
+    - name: Dump GitHub context
+      env:
+        GITHUB_CONTEXT: ${{ toJson(github) }}
+      run: echo "$GITHUB_CONTEXT"
+
+    - name: Install Helm ⛑
+      run: |
+        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+        chmod 700 get_helm.sh
+        ./get_helm.sh
+    - name: Add Rasa X Helm chart repo
+      run: |
+        helm repo add rasa-x https://rasahq.github.io/rasa-x-helm
+    - name: Authenticate with gcloud 🎫
+      env:
+        GCLOUD_SERVICE_ACCOUNT_NAME: rasa-x-ee-deploy@rasa-platform.iam.gserviceaccount.com
+        GCLOUD_SERVICE_ACCOUNT_KEYFILE: ${{ secrets.RASA_PLATFORM_GKE_SERVICE_ACCOUNT }}
+        GCLOUD_ZONE_ID: europe-west1
+        GCLOUD_CLUSTER_NAME: rasa-x-ci
+        GCLOUD_PROJECT_ID: rasa-platform
+      run: |
+        ${GITHUB_WORKSPACE}/deployment/scripts/log_into_gcloud.sh
+        gcloud container clusters get-credentials "$GCLOUD_CLUSTER_NAME" --project ${GCLOUD_PROJECT_ID} --zone "$GCLOUD_ZONE_ID"
+    - name: Set variable for namespace (= branch name)
+      env:
+        BRANCH: ${{ github.ref }}
+      run: |
+        NAMESPACE=${BRANCH##*/}
+        # Remove invalid character from namespace (letters, numbers and hyphens are ok)
+        NAMESPACE=$(echo ${NAMESPACE} | sed "s/[^[:alnum:]-]//g")
+        echo ::set-env name=NAMESPACE::${NAMESPACE}
+        echo ::set-env name=RELEASE_NAME::rasa-x
+    - name: Prepare namespace
+      run: |
+        kubectl create ns "${NAMESPACE}"  && kubectl label ns "${NAMESPACE}" "prTesting=true" || true
+        kubectl config set-context --current --namespace="${NAMESPACE}"
+    - name: Delete old release
+      run: |
+        helm delete ${RELEASE_NAME} || true
+        # Delete volume claims which usually would be persisted among releases
+        kubectl delete pvc -l release=$RELEASE_NAME || true
+        sleep 60
+    - name: Set resource limit for namespace
+      run: |
+        # Set a small limit range so the cluster can autoscale
+        # https://kubernetes.io/docs/concepts/policy/limit-range/
+        cat <<EOF | kubectl replace --force -f  -
+        apiVersion: v1
+        kind: LimitRange
+        metadata:
+          name: default-limit-range
+        spec:
+          limits:
+          - defaultRequest:
+              memory: 256Mi
+              cpu: 250m
+            type: Container
+        EOF
+    - name: Prepare user credentials 🎫
+      run: |
+        echo ::set-env name=RASA_X_PASSWORD::$(openssl rand -hex 20)
+        echo ::set-env name=RASA_X_USERNAME::${{ github.actor }}
+    - name: Deploy Rasa X chart ☸️
+      run: |
+        RASA_X_TMP_VERSION=branch.${BRANCH##*/}
+        # Source env file for Rasa Open Source version
+        set -o allexport; source .env; set +o allexport
+        helm upgrade --install ${RELEASE_NAME} rasa-x/rasa-x \
+          --set rasax.tag="${RASA_X_TMP_VERSION}" \
+          --set rasax.name=gcr.io/rasa-platform/rasa-x-ee \
+          --set eventService.tag="${RASA_X_TMP_VERSION}" \
+          --set eventService.name=gcr.io/rasa-platform/rasa-x-ee \
+          --set nginx.tag="${RASA_X_TMP_VERSION}" \
+          --set nginx.name=gcr.io/rasa-platform/nginx \
+          --set nginx.service.type=LoadBalancer \
+          --set rasax.passwordSalt=$(openssl rand -hex 20) \
+          --set rasax.token=$(openssl rand -hex 20) \
+          --set rasax.jwtSecret=$(openssl rand -hex 20) \
+          --set rasax.disableTelemetry=true \
+          --set rasax.initialUser.username=${RASA_X_USERNAME} \
+          --set rasax.initialUser.password=${RASA_X_PASSWORD} \
+          --set rasa.token=$(openssl rand -hex 20) \
+          --set rasa.tag="${RASA_VERSION}-full" \
+          --set rabbitmq.rabbitmq.password=$(openssl rand -hex 20) \
+          --set global.postgresql.postgresqlPassword=$(openssl rand -hex 20) \
+          --set global.redis.password=$(openssl rand -hex 20) \
+          --set duckling.enabled=false
+    - name: Wait for deployment to be ready ⏰
+      run: |
+        kubectl wait \
+          --for=condition=available \
+          --timeout=420s \
+          -l "app.kubernetes.io/component=rasa-x" deployment
+    - name: Prepare login url 🔗
+      run: |
+        external_ip=""
+        while [[ -z ${external_ip} ]]; do
+          echo "Waiting for end point..."
+          external_ip=$(kubectl get svc -l "app.kubernetes.io/component=nginx" -o=jsonpath='{.items[].status.loadBalancer.ingress[].ip}')
+          [[ -z "${external_ip}" ]] && sleep 10
+        done
+        message="Rasa Enterprise deployment ready: http://${external_ip}:8000/login?username=${RASA_X_USERNAME}&password=${RASA_X_PASSWORD}"
+        echo ::set-env name=DEPLOYMENT_READY_MESSAGE::${message}
+    - name: Post login url on PR @
+      uses: unsplash/comment-on-pr@master
+      continue-on-error: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        msg: ${{ env.DEPLOYMENT_READY_MESSAGE }}
