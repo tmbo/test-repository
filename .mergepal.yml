@@ -1,3 +1,4 @@
+  
 whitelist:
   - status:ready-to-merge
 method: merge
