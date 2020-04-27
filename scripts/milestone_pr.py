@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 
-def check_if_pr_has_release_milestone(event: Optional[Dict[Text, Any]]):
+def check_if_pr_has_release_milestone(event: Optional[Dict[Text, Any]]) -> bool:
     if (
         not event
         or not event.get("pull_request")
