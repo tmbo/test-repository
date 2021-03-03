@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - uses: rasahq/update-pr-branch@189fe0687022af5d789547f5867cc2525f96b068
+      - uses: rasahq/update-pr-branch@601ac3dadf708b14e7f0252d98230538235f99d9
         with:
           token: ${{ secrets.PERSONAL_GITHUB_TOKEN }}
           required_approval_count: 0
